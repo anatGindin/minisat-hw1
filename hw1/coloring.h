@@ -2,6 +2,7 @@
 #define COLORING_H_
 
 #include <vector>
+#include <cassert>
 #include "minisat/core/Solver.h"
 
 using namespace std;
@@ -74,18 +75,40 @@ public:
     }
 
     void addOneColorConstraints(int node) {
-        assert (node < m_graph.getNumberOfNodes());
+        assert(node < m_graph.getNumberOfNodes());
 
         // Add your code here
+        Minisat::vec<Minisat::Lit> varVec = Minisat::vec<Minisat::Lit>();
+        Minisat::Var nodeColorVar;
+        for(int i = 0; i < this->m_nNumberOfColors; i++){
+            nodeColorVar = getNodeHasColorVar(node, i);
+            varVec.push(Minisat::mkLit(nodeColorVar, false));
+        }
+        m_solver.addClause(varVec);
+
+        //Minisat::vec<Minisat::Lit> onlyOneColor;
+        for(int c1 = 0; c1 < this->m_nNumberOfColors; c1++){
+            for (int c2 = c1 + 1; c2 < this->m_nNumberOfColors; c2++) {
+                Minisat::vec<Minisat::Lit> onlyOneColor = Minisat::vec<Minisat::Lit>();
+                onlyOneColor.push(Minisat::mkLit(getNodeHasColorVar(node, c1), true));
+                onlyOneColor.push(Minisat::mkLit(getNodeHasColorVar(node, c2), true));
+                m_solver.addClause(onlyOneColor);
+            }
+        }
     }
 
     void addEdgeColoringConstraints(int n1, int n2) {
-        assert (n1 < m_graph.getNumberOfNodes() &&
+        assert(n1 < m_graph.getNumberOfNodes() &&
                 n2 < m_graph.getNumberOfNodes());
-        assert (n1 <= n2);
+        assert(n1 <= n2);
 
         // Add your code here
-
+        Minisat::vec<Minisat::Lit> varVec = Minisat::vec<Minisat::Lit>();
+        for(int i = 0; i < this->m_nNumberOfColors; i++){
+            varVec.push(Minisat::mkLit(getNodeHasColorVar(n1, i), true));
+            varVec.push(Minisat::mkLit(getNodeHasColorVar(n2, i), true));
+        }
+        m_solver.addClause(varVec);
     }
 
     bool isColorable()
@@ -127,7 +150,25 @@ public:
             }
         }
 
-        // Add your code here
+
+        while (m_solver.solve()){
+            vector<Minisat::lbool> currentAssignment;
+            Minisat::vec<Minisat::Lit> blockingClause;
+
+            for (int i = 0; i < m_solver.nVars(); i++) {
+                Minisat::lbool val = m_solver.model[i];
+                currentAssignment.push_back(val);
+
+                if (val == Minisat::l_True) {
+                    blockingClause.push(Minisat::mkLit(i, true));
+                } else if (val == Minisat::l_False) {
+                    blockingClause.push(Minisat::mkLit(i, false));
+                }
+            }
+
+            allColoring.push_back(currentAssignment);
+            m_solver.addClause(blockingClause);
+        }
     }
 
 private:
